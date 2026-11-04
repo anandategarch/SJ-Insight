@@ -1,13 +1,21 @@
 # SJ Insight — Analisa Pemindahan Barang DC ↔ RESTO
 #
-# Mirror Waste repo (pinned dependencies yang sama):
-# - PySide6 (UI framework)
-# - pandas 2.2.x (pipeline)
-# - python-calamine (loader cepat — OPSIONAL, fallback openpyxl otomatis)
-# - openpyxl (exporter WriteOnlyCell streaming)
+# Instalasi:  pip install -r requirements.txt
+# (SETUP.bat otomatis membuat virtualenv .venv lalu menjalankan file ini)
+#
+# PIN RASIONAL:
+# - PySide6-Essentials (bukan PySide6 metapackage!): UI SJ Insight hanya
+#   memakai widget inti (QWidget/QTableView/QThread/QSS) — TIDAK butuh
+#   WebEngine (131 MB), Addons (40 MB), atau Pdf (3 MB). Essentials saja
+#   (~82 MB) = download & install 3x lebih cepat, dan nested path-nya
+#   lebih pendek (anti Windows Long Path issue).
+# - pandas 2.2.x: pipeline diuji penuh di 2.2.3; pandas 3.x belum diverifikasi
+#   (copy-on-write jadi default = breaking change).
+# - python-calamine OPSIONAL: loader punya fallback openpyxl otomatis — kalau
+#   installnya gagal di platform tertentu, aplikasi tetap jalan (lebih lambat).
 
+PySide6-Essentials>=6.6
 pandas>=2.2,<3
 numpy>=1.26
 openpyxl>=3.1
 python-calamine>=0.2
-PySide6>=6.6

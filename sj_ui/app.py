@@ -13,7 +13,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -158,7 +158,7 @@ class MainWindow(QMainWindow):
     def _build_toolbar(self) -> None:
         tb = self.addToolBar("Utama")
         tb.setMovable(False)
-        tb.setIconSize(tb.iconSize().expandedBy(tb.iconSize()))
+        tb.setIconSize(QSize(18, 18))
 
         act_export = QAction("💾 Ekspor Excel", self)
         act_export.setShortcut(QKeySequence("Ctrl+E"))
