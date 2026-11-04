@@ -1,0 +1,80 @@
+{
+  "_meta": {
+    "app": "SJ Insight — Analisa Pemindahan Barang DC ↔ RESTO",
+    "version": "1.0.0",
+    "source": "Replika Power Query M code '04.QUERRY SJ.xlsb' (29 query, 1.034 baris)",
+    "edited": "Edit threshold di file ini — perubahan berlaku mulai run berikutnya."
+  },
+
+  "input_sheets": {
+    "kirim":    ["#42.15. Pemindahan Barang (KIRI", "42.15. Pemindahan Barang", "Pemindahan Barang"],
+    "terima":   ["#42.05. Rincian Pemindahan Bara", "42.05. Rincian Pemindahan", "Rincian Pemindahan"],
+    "kategori": ["Sheet1", "DBS_KATEGORI", "KATEGORI"]
+  },
+
+  "kirim_columns": {
+    "no_pemindahan": ["No. Pemindahan #", "No Pemindahan #", "No. Pemindahan"],
+    "tanggal":       ["Tanggal"],
+    "tgl_create":    ["Tgl/Jam Pembuatan", "Tgl / Jam Pembuatan"],
+    "pengirim":      ["Gudang Pengirim"],
+    "tujuan":        ["Gudang Tujuan"],
+    "kode":          ["Kode Barang"],
+    "nama":          ["Nama Barang"],
+    "satuan":        ["Satuan"],
+    "qty_terkecil":  ["Kts Diterima", "QTY Terkecil", "Kts. Diterima"],
+    "kuantitas":     ["Kuantitas"],
+    "status":        ["Status Pemindahan Barang", "Status Pemindahan"]
+  },
+
+  "terima_columns": {
+    "nomor_kirim":     ["Nomor #Kirim", "Nomor Kirim"],
+    "nomor_terima":    ["Nomor #Terima", "Nomor Terima"],
+    "gudang_kirim":    ["Gudang #Kirim"],
+    "gudang_terima":   ["Gudang #Terima"],
+    "status":          ["Status Pengiriman #", "Status Pengiriman"],
+    "tgl_kirim":       ["Tanggal #Kirim"],
+    "tgl_terima":      ["Tanggal #Terima"],
+    "vs":              ["#Tgl Kirim vs Tgl Terima", "Tgl Kirim vs Tgl Terima"],
+    "kode":            ["Kode Barang"],
+    "nama":            ["Nama Barang"],
+    "sat_kirim":       ["#Sat. Kirim", "Sat. Kirim"],
+    "qty_kirim":       ["#Qty Kirim", "Qty Kirim"],
+    "rasio":           ["Rasio Satuan"],
+    "sat_terkecil":    ["#Sat. Terkecil", "Sat. Terkecil"],
+    "qty_terkecil":    ["#Qty. Terkecil", "Qty. Terkecil"],
+    "tgl_it":          ["#Tgl/Jam Pembuatan IT", "Tgl/Jam Pembuatan IT"],
+    "dok":             ["Memiliki dokumen (Terima)", "Memiliki Dokumen (Terima)"]
+  },
+
+  "kategori_columns": {
+    "nama":  ["NAMA BARANG", "Nama Barang"],
+    "kat":   ["KATEGORI", "Kategori"],
+    "jenis": ["JENIS", "Jenis"]
+  },
+
+  "thresholds": {
+    "QTY_EXTREME_FACTOR":   3.5,
+    "QTY_TINY_FACTOR":      0.1,
+    "MIN_TRANSAKSI":        3,
+    "DEVIASI_ANOMALI":      0.10,
+    "DEVIASI_PERLU_CEK":    0.05,
+    "DOMINASI_MIN":         0.50,
+    "TERIMA_LAMBAT_HARI":   2
+  },
+
+  "whole_units":        ["PCS", "KARTON", "KARUNG", "JURIGEN", "PACK", "BOTTLE", "BOX", "CUP"],
+  "diterima_status":    ["Diterima Seluruh nya", "Diterima Seluruhnya"],
+  "depo_replacement":   "DCSMGMUR",
+
+  "default_key_akhir":  31,
+
+  "output": {
+    "default_filename":   "SJ_Analisa_Report.xlsx",
+    "streaming_threshold": 35000,
+    "detail_sheet":       "Detail",
+    "anomali_sheet":      "Anomali Prioritas",
+    "ringkasan_sheet":    "Ringkasan",
+    "rekap_count_sheet":  "Rekap Count",
+    "log_sheet":          "Log Run"
+  }
+}

@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual env
+.venv/
+venv/
+env/
+ENV/
+
+# Logs (mirror Waste repo)
+logs/
+*.log
+
+# Output Excel (mirror Waste — generated files, bukan source)
+output/
+*.xlsx
+!data/*.xlsx
+!sample_workbook.xlsx
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# PyInstaller build artifacts (mirror Waste repo)
+*.spec.bak
+build_exe/

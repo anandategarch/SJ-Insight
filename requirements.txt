@@ -1,0 +1,13 @@
+# SJ Insight — Analisa Pemindahan Barang DC ↔ RESTO
+#
+# Mirror Waste repo (pinned dependencies yang sama):
+# - PySide6 (UI framework)
+# - pandas 2.2.x (pipeline)
+# - python-calamine (loader cepat — OPSIONAL, fallback openpyxl otomatis)
+# - openpyxl (exporter WriteOnlyCell streaming)
+
+pandas>=2.2,<3
+numpy>=1.26
+openpyxl>=3.1
+python-calamine>=0.2
+PySide6>=6.6
