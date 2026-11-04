@@ -363,11 +363,14 @@ class PipelineView(QWidget):
             "done",
         )
         # Set dataset ke context → trigger data_ready (tab lain render)
-        df = summary.pop("df")
-        df_merged = summary.pop("df_merged")
-        df_count = summary.pop("df_count")
+        df = summary.pop("df", None)
+        df_merged = summary.pop("df_merged", None)
+        df_count = summary.pop("df_count", None)
         summary.pop("df_kategori", None)
         summary.pop("df_terima", None)
+        if df is None or df_merged is None or df_count is None:
+            self._on_failed("Pipeline merusak kontrak (df/df_merged/df_count hilang)", "")
+            return
         summary["df_count"] = df_count  # kembalikan utk exporter
         self.ctx.set_dataset(df, df_merged, df_count, summary)
 

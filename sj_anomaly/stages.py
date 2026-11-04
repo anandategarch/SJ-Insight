@@ -810,6 +810,16 @@ def merge_all(
         rows.append(merged)
 
     df_merged = pd.DataFrame(rows)
+
+    # Back-fill "Count" per Concet (mirror M code 4215TerimaCount → 4215Terima&Count
+    # join). DETAIL_COLS di exporter membaca _g("Count") — tanpa ini, kolom
+    # "Count Terima (Concet)" di sheet Detail/Anomali akan kosong.
+    if "Concet" in df_merged.columns and len(df_merged):
+        counts = df_merged.groupby("Concet")["Concet"].transform("count").astype(int)
+        df_merged["Count"] = counts
+    else:
+        df_merged["Count"] = 0
+
     df_merged.attrs["terima_dup_count"] = len(terima_dup)
     df_merged.attrs["tanpa_terima"] = sum(1 for r in rows if not r["Memiliki Dokumen [Terima]"])
     return df_merged

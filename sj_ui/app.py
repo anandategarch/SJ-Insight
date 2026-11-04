@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
     QTextBrowser,
     QVBoxLayout,
     QDialog,
-    QWidget,
 )
 
 from sj_anomaly.followup import FP_COL  # noqa: F401  (constant contract)

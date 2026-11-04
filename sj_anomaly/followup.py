@@ -20,10 +20,7 @@ CHECK_COL = "✓"
 
 def fingerprint_row(row: pd.Series | dict) -> str:
     """Sidik jari baris: No. Pemindahan # + Nama Barang + Tanggal + Satuan + QTY."""
-    if isinstance(row, pd.Series):
-        get = lambda k: row.get(k, "")
-    else:
-        get = lambda k: row.get(k, "")
+    get = lambda k: row.get(k, "")
     return "|".join([
         str(get("No. Pemindahan #") or ""),
         str(get("Nama Barang") or ""),

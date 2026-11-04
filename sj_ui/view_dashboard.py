@@ -10,11 +10,9 @@ Tampilan:
 from __future__ import annotations
 
 import pandas as pd
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
     QScrollArea,
     QVBoxLayout,
@@ -25,7 +23,7 @@ from sj_anomaly.utils import fmt_date_id
 
 from .shared import fmt_id
 from .state import AppContext
-from .widgets import DataTable, KpiCard, WLabel
+from .widgets import DataTable, KpiCard
 
 
 class DashboardView(QWidget):
