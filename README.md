@@ -130,6 +130,55 @@ v2.99.202.0). Mapping header asli dipertahankan agar hasil 1:1 dengan Excel:
 | openpyxl | >=3.1 | Exporter WriteOnlyCell + list_sheets |
 | python-calamine | >=0.2 | Loader cepat (Rust, 7-10× openpyxl) — OPSIONAL, fallback otomatis |
 
+## Troubleshooting
+
+### ❌ Error: `Could not install packages due to an OSError: [Errno 2] No such file or directory: ...\PySide6\qml\Qt\labs\assetdownloader\...\*.obj`
+
+**Penyebab**: Windows Long Path belum di-enable. PySide6 punya nested path >260 karakter
+(`PySide6\qml\Qt\labs\assetdownloader\objects-Debug\QmlAssetDownloaderPrivate_resources_1\.qt\rcc\qrc_qmake_Qt_labs_assetdownloader_init.cpp.obj`). Limit default Windows = 260 char.
+
+**Solusi 1 (recommended, sekali buat selamanya)** — Enable Windows Long Paths:
+
+Buka **PowerShell sebagai Administrator** (klik kanan PowerShell → "Run as administrator"), lalu jalankan satu baris:
+
+```powershell
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+```
+
+Tutup command prompt, buka baru, jalankan `SETUP.bat` lagi.
+
+**Solusi 2 (tanpa admin)** — SETUP.bat versi baru sudah otomatis buat virtualenv
+di folder pendek (`.venv` di root repo), sehingga total path PySide6 tetap <260 char.
+Pastikan Anda pakai SETUP.bat versi terbaru (git pull).
+
+**Solusi 3 (manual)** — Pindahkan folder SJ-Insight ke root pendek (mis. `C:\SJ`),
+lalu jalankan SETUP.bat. Atau install tanpa cache:
+
+```bat
+pip install -r requirements.txt --no-cache-dir
+```
+
+### ❌ Error: `ModuleNotFoundError: No module named 'PySide6'`
+
+Virtualenv belum diaktifkan. Jalankan via `MULAI.bat` (auto-aktifkan virtualenv),
+atau manual:
+
+```bat
+.venv\Scripts\activate
+python ui_app.py
+```
+
+### ❌ Python dari Microsoft Store (path panjang)
+
+Python dari Microsoft Store install ke `C:\Users\<user>\AppData\Local\Packages\
+PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\...` — sangat panjang.
+Kombinasi dengan nested PySide6 mudah trigger Long Path issue.
+
+**Recommended**: Install Python resmi dari https://python.org (path pendek
+`C:\Python313\` atau `C:\Users\<user>\AppData\Local\Programs\Python\Python313\`),
+lalu jalankan SETUP.bat.
+
 ## Lisensi
+
 
 Internal use — replika logika internal Excel untuk tim operasional.

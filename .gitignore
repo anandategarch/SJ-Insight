@@ -9,11 +9,13 @@ __pycache__/
 dist/
 build/
 
-# Virtual env
+# Virtual env (diaktifkan SETUP.bat — path pendek anti Windows Long Path)
 .venv/
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
 # Logs (mirror Waste repo)
 logs/
