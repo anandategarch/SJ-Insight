@@ -26,7 +26,7 @@ from pathlib import Path
 
 from . import stages
 from . import signals as sig
-from .loader import load_kategori, load_kirim, load_terima
+from .loader import load_kategori, load_kirim, load_terima, resolve_source_path
 from .schema import (
     SchemaValidationError,
     validate_kategori_schema,
@@ -76,9 +76,9 @@ def run_pipeline(
     """Jalankan pipeline lengkap. Return summary dict (utk UI display).
 
     Args:
-        kirim_path:    Path ke workbook 42.15 Pemindahan Barang (Kirim).
-        terima_path:   Path ke workbook 42.05 Rincian Pemindahan (Terima).
-        kategori_path: Path ke workbook DBS Kategori.
+        kirim_path:    Path ke workbook 42.15 ATAU folder berisi banyak .xlsx.
+        terima_path:   Path ke workbook 42.05 ATAU folder.
+        kategori_path: Path ke workbook DBS Kategori ATAU folder.
         config_path:   Path ke config.json custom (opsional).
         progress_callback: callable(msg: str, pct: float) utk update UI.
         cancel_check:  callable() -> bool, opsional. Dicek antar-stage.
@@ -102,6 +102,50 @@ def run_pipeline(
             "error": str(exc),
             "log": exc.log,
         }
+
+
+def run_pipeline_from_folders(
+    config_path: str | os.PathLike | None = None,
+    overrides: dict[str, str] | None = None,
+    progress_callback=None,
+    cancel_check=None,
+) -> dict:
+    """Jalankan pipeline dengan path otomatis dari ``source_folders`` config.
+
+    Mirror Power Query: baca SEMUA .xlsx dari folder yang sama persis dengan
+    yang ada di M code ``Folder.Files("C:\\KERJA\\1. RESTO\\9.NEW QUERY\\<sub>")``.
+
+    Args:
+      config_path:  Path config.json (None = default).
+      overrides:    dict opsional utk override path, mis.
+                    {'kirim': 'D:/data/kirim.xlsx', 'terima': 'D:/data/terima'}.
+                    Bisa berupa file tunggal atau folder.
+    """
+    config = load_config(config_path)
+    overrides = overrides or {}
+    kirim_path = resolve_source_path("kirim", config, overrides.get("kirim"))
+    terima_path = resolve_source_path("terima", config, overrides.get("terima"))
+    kategori_path = resolve_source_path("kategori", config, overrides.get("kategori"))
+
+    if not kirim_path or not terima_path or not kategori_path:
+        missing = [
+            k for k, v in [("kirim", kirim_path), ("terima", terima_path),
+                           ("kategori", kategori_path)] if not v
+        ]
+        return {
+            "success": False,
+            "error": (
+                f"Path sumber belum diatur utk: {missing}. Atur 'source_folders' di "
+                f"config.json (base + <key>_subfolder), atau pilih file/folder manual di tab Pipeline."
+            ),
+            "log": "",
+        }
+    return run_pipeline(
+        kirim_path, terima_path, kategori_path,
+        config_path=config_path,
+        progress_callback=progress_callback,
+        cancel_check=cancel_check,
+    )
 
 
 def _run_pipeline(

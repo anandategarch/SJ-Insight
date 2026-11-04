@@ -1,7 +1,8 @@
 """view_pipeline.py — tab Pipeline: input + run + log (mirror Waste view_pipeline).
 
 Komponen:
-  - 3 input file: Kirim / Terima / Kategori (browse + Pakai Sample)
+  - Toggle Mode: Folder Otomatis (dari config M code) vs Pilih File Manual
+  - 3 input: Kirim / Terima / Kategori (browse file ATAU folder + Pakai Sample)
   - Tombol Run / Cancel
   - Progress bar + persen
   - Daftar stage (PIPELINE_STAGES) dengan status
@@ -13,6 +14,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -27,6 +29,8 @@ from PySide6.QtWidgets import (
 )
 
 from sj_anomaly.pipeline import PIPELINE_STAGES
+from sj_anomaly.utils import load_config
+from sj_anomaly.loader import resolve_source_path
 
 from .shared import APP_VERSION
 from .state import AppContext
@@ -44,6 +48,7 @@ class PipelineView(QWidget):
         self.setObjectName("pipelineView")
         self.ctx = ctx
         self._worker: PipelineWorker | None = None
+        self._folder_mode = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -59,6 +64,27 @@ class PipelineView(QWidget):
         sub.setObjectName("muted")
         sub.setStyleSheet("font-size: 12px;")
         layout.addWidget(sub)
+
+        # ---- Mode toggle: Folder Otomatis vs File Manual ----
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(10)
+        self._folder_chk = QCheckBox(
+            "📂 Mode Folder Otomatis — baca SEMUA .xlsx dari folder di config "
+            "(mirror Power Query Folder.Files)"
+        )
+        self._folder_chk.setCursor(Qt.PointingHandCursor)
+        self._folder_chk.toggled.connect(self._on_mode_toggle)
+        mode_row.addWidget(self._folder_chk)
+        mode_row.addStretch()
+        self._auto_fill_btn = QPushButton("🔄 Isi Otomatis dari Config")
+        self._auto_fill_btn.setObjectName("ghost")
+        self._auto_fill_btn.setCursor(Qt.PointingHandCursor)
+        self._auto_fill_btn.setToolTip(
+            "Isi 3 field dengan path folder dari config.json (sumber M code)"
+        )
+        self._auto_fill_btn.clicked.connect(self._on_auto_fill)
+        mode_row.addWidget(self._auto_fill_btn)
+        layout.addLayout(mode_row)
 
         # ---- Input cards ----
         input_row = QHBoxLayout()
@@ -148,6 +174,9 @@ class PipelineView(QWidget):
         self.ctx.log_line.connect(self._on_log_line)
         self.ctx.status.connect(self._on_status)
 
+        # Auto-fill pada startup (supaya user langsung lihat path M code)
+        self._on_auto_fill()
+
     # ------------------------------------------------------------
     # Build helpers
     # ------------------------------------------------------------
@@ -158,7 +187,7 @@ class PipelineView(QWidget):
         kind: str,
         layout: QHBoxLayout,
     ) -> QLineEdit:
-        """Bangun kartu input file dengan tombol Browse + Sample."""
+        """Bangun kartu input file/folder dengan tombol Browse + Sample."""
         card = QFrame()
         card.setObjectName("card")
         v = QVBoxLayout(card)
@@ -175,22 +204,82 @@ class PipelineView(QWidget):
 
         row = QHBoxLayout()
         edit = QLineEdit()
-        edit.setPlaceholderText(f"Pilih file .xlsx utk {title}")
+        edit.setPlaceholderText(f"Pilih file .xlsx / folder utk {title}")
+        edit.setProperty("kind", kind)
         row.addWidget(edit, 1)
         browse = QPushButton("Telusuri…")
-        browse.clicked.connect(lambda: self._browse(edit))
+        browse.setProperty("kind", kind)
+        browse.clicked.connect(lambda checked=False, e=edit, k=kind: self._browse(e, k))
         row.addWidget(browse)
         v.addLayout(row)
 
         layout.addWidget(card, 1)
         return edit
 
-    def _browse(self, edit: QLineEdit) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Pilih file Excel", "", "Excel Workbook (*.xlsx *.xlsm);;Semua file (*)"
-        )
-        if path:
-            edit.setText(path)
+    def _browse(self, edit: QLineEdit, kind: str) -> None:
+        """Browse file ATAU folder tergantung mode."""
+        if self._folder_mode:
+            # Folder picker
+            start_dir = edit.text().strip() or ""
+            if start_dir and not Path(start_dir).is_dir():
+                # Coba parent dari file path
+                p = Path(start_dir)
+                if p.parent.exists():
+                    start_dir = str(p.parent)
+                else:
+                    start_dir = ""
+            path = QFileDialog.getExistingDirectory(
+                self,
+                f"Pilih folder {kind} (semua .xlsx akan dibaca)",
+                start_dir or "",
+            )
+            if path:
+                edit.setText(path)
+        else:
+            # File picker
+            start_dir = ""
+            cur = edit.text().strip()
+            if cur and Path(cur).parent.exists():
+                start_dir = str(Path(cur).parent)
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Pilih file Excel", start_dir,
+                "Excel Workbook (*.xlsx *.xlsm);;Semua file (*)",
+            )
+            if path:
+                edit.setText(path)
+
+    # ------------------------------------------------------------
+    # Mode toggle + auto-fill
+    # ------------------------------------------------------------
+    def _on_mode_toggle(self, checked: bool) -> None:
+        self._folder_mode = checked
+        if checked:
+            self._on_auto_fill()
+            self._on_status(
+                "Mode Folder Otomatis AKTIF — baca semua .xlsx dari folder config", "running"
+            )
+        else:
+            self._on_status("Mode File Manual — pilih 3 file .xlsx individually", "running")
+
+    def _on_auto_fill(self) -> None:
+        """Isi 3 field dengan path dari config source_folders (mirror M code)."""
+        try:
+            config = load_config()
+        except Exception:
+            return
+        for key, edit in [
+            ("kirim", self._kirim_edit),
+            ("terima", self._terima_edit),
+            ("kategori", self._kategori_edit),
+        ]:
+            resolved = resolve_source_path(key, config)
+            if resolved:
+                edit.setText(resolved)
+                edit.setStyleSheet("")
+            else:
+                edit.setPlaceholderText(
+                    f"Atur 'source_folders.{key}_subfolder' di config.json"
+                )
 
     # ------------------------------------------------------------
     # Run / Cancel
@@ -199,12 +288,23 @@ class PipelineView(QWidget):
         kirim = self._kirim_edit.text().strip()
         terima = self._terima_edit.text().strip()
         kategori = self._kategori_edit.text().strip()
+
+        # Bila folder mode & field kosong → resolve dari config
+        if self._folder_mode:
+            config = load_config()
+            kirim = kirim or resolve_source_path("kirim", config)
+            terima = terima or resolve_source_path("terima", config)
+            kategori = kategori or resolve_source_path("kategori", config)
+
         if not (kirim and terima and kategori):
-            self._on_status("Lengkapi ketiga file input terlebih dahulu.", "error")
+            self._on_status("Lengkapi ketiga sumber (file atau folder) terlebih dahulu.", "error")
             return
-        if not (Path(kirim).exists() and Path(terima).exists() and Path(kategori).exists()):
-            self._on_status("Salah satu file tidak ditemukan — cek path.", "error")
-            return
+
+        # Validate existence (file atau folder)
+        for label, p in [("Kirim", kirim), ("Terima", terima), ("Kategori", kategori)]:
+            if not Path(p).exists():
+                self._on_status(f"Sumber {label} tidak ditemukan: {p}", "error")
+                return
 
         # Reset UI
         self._log.clear()
@@ -217,8 +317,14 @@ class PipelineView(QWidget):
         self._run_btn.setEnabled(False)
         self._cancel_btn.setEnabled(True)
 
-        # Start worker
-        self._worker = PipelineWorker(kirim, terima, kategori, parent=self)
+        # Start worker (folder_mode bila toggle ON)
+        self._worker = PipelineWorker(
+            kirim_path=kirim,
+            terima_path=terima,
+            kategori_path=kategori,
+            folder_mode=self._folder_mode,
+            parent=self,
+        )
         self._worker.progress.connect(self._on_progress)
         self._worker.done.connect(self._on_done)
         self._worker.failed.connect(self._on_failed)

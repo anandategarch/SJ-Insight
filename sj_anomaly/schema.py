@@ -62,10 +62,13 @@ def validate_kirim_schema(df: pd.DataFrame, config: dict, logger=None) -> list[s
     all_required_keys = ["nama", "satuan", "status"]
     missing: list[str] = []
     hints: list[str] = []
+    found_map: dict[str, str] = {}
     for key in all_required_keys:
         cand = kirim_cfg.get(key, [])
         found = _find_column(columns, cand)
-        if not found:
+        if found:
+            found_map[key] = found
+        else:
             missing.append(f"{key} (kandidat: {cand[:2]})")
             for c in cand:
                 near = _suggest_near_miss(c, columns)
@@ -74,10 +77,15 @@ def validate_kirim_schema(df: pd.DataFrame, config: dict, logger=None) -> list[s
                     break
 
     if missing:
+        # Sertakan info header row + sample headers utk diagnosis
+        hdr_row = df.attrs.get("header_row", "?")
+        sample_cols = columns[:12]
         raise SchemaValidationError(
             f"Kolom WAJIB hilang dari sheet Kirim (42.15): {missing}. "
+            f"Header terdeteksi di baris {hdr_row}. "
+            f"Kolom tersedia ({len(columns)} total): {sample_cols}... "
             f"Pastikan file adalah report '42.15 Pemindahan Barang (KIRIM)' "
-            f"dengan header di baris ke-4 (3 baris judul ACCURATE di atasnya). "
+            f"dengan header 'Nama Barang' / 'Satuan' / 'Status Pemindahan Barang'. "
             + (f" Petunjuk: {'; '.join(hints)}." if hints else "")
         )
 

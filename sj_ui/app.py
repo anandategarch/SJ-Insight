@@ -47,18 +47,31 @@ def _build_help_html() -> str:
     """Bangun HTML Bantuan (F1)."""
     return f"""
 <h2>Panduan Singkat — SJ Insight v{APP_VERSION}</h2>
-<p><b>Alur kerja:</b> tab <b>Pipeline</b> → pilih 3 file Excel (42.15 Kirim /
-42.05 Terima / DBS Kategori) → <b>▶ Jalankan Analisa</b> → buka tab
+<p><b>Alur kerja:</b> tab <b>Pipeline</b> → centang <b>📂 Mode Folder Otomatis</b>
+(atau pilih 3 file manual) → <b>▶ Jalankan Analisa</b> → buka tab
 <b>Dashboard</b> untuk KPI / <b>Anomali</b> untuk tabel baris mencurigakan /
 <b>Kirim vs Terima</b> untuk rekonsiliasi dokumen.</p>
 <p><b>Shortcut:</b> <b>Ctrl+1..Ctrl+4</b> pindah tab · <b>Ctrl+E</b> ekspor Excel
 · <b>F1</b> bantuan ini.</p>
 <h3>Tab Pipeline (tempat semua dimulai)</h3>
 <ul>
-<li>Isi ketiga <b>Input File</b>: tombol <b>Telusuri…</b> memilih file Excel.</li>
+<li><b>📂 Mode Folder Otomatis</b> — baca SEMUA file .xlsx dari folder yang
+sama persis dengan Power Query M code di <code>04.QUERRY SJ.xlsb</code>:
+<code>C:\\KERJA\\1. RESTO\\9.NEW QUERY\\3. 42.15</code> (Kirim),
+<code>\\4. 42.05</code> (Terima), <code>\\21. DBS Kategori</code>.
+Mirror dari <code>Folder.Files("...")</code> + invoke transform. Tombol
+<b>🔄 Isi Otomatis dari Config</b> mengisi 3 field dengan path dari
+<code>config.json</code>.</li>
+<li><b>Mode File Manual</b> (default) — pilih 3 file .xlsx individually via
+<b>Telusuri…</b>. Bisa juga pilih <b>folder</b> (semua .xlsx di folder dibaca).</li>
 <li>42.15 Kirim — report ACCURATE sisi pengiriman (sheet '#42.15. Pemindahan
 Barang (KIRI'). 42.05 Terima — bukti penerimaan (sheet '#42.05. Rincian
 Pemindahan Bara'). DBS Kategori — master kategori (sheet 'Sheet1').</li>
+<li><b>Auto-detect header row</b> — program otomatis mencari baris header
+berdasarkan keyword ('Nama Barang', 'Satuan', 'Nomor #Kirim', dst.). Ini
+menangani report ACCURATE dengan jumlah baris judul yang bervariasi (2/3/4)
+dan header merged-cell (kolom genap terbaca 'nan' / 'ColumnN' otomatis
+dilewati).</li>
 <li><b>▶ Jalankan Analisa ↔ ⏹ Batalkan Run</b> — satu tombol dua-mode;
 pembatalan efektif di gerbang antar-stage (F9).</li>
 <li>Selama run: <b>progres</b> (persen) + <b>log proses</b> per stage terlihat.</li>
@@ -94,7 +107,9 @@ laporan 6 sheet: Detail · Anomali Prioritas · Ringkasan · Rekap Count · Log 
 <p>Program ini adalah replika Power Query M code dari file
 <b>04.QUERRY SJ.xlsb</b> (29 query, 1.034 baris M code). Semua mapping header,
 aturan anomali (satuan/QTY/konversi), dan join kirim-terima mengikuti M code
-tersebut persis. Threshold bisa di-override via <code>config.json</code>.</p>
+tersebut persis. Path folder sumber di <code>config.json</code> sama dengan
+<code>Folder.Files("C:\\KERJA\\1. RESTO\\9.NEW QUERY\\...")</code> di M code.
+Threshold bisa di-override via <code>config.json</code>.</p>
 """
 
 

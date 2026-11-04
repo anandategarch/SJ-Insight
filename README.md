@@ -83,7 +83,29 @@ python ui_app.py
 
 ### 3. Alur di UI
 
-1. **Tab Pipeline** → pilih 3 file Excel:
+#### Mode Folder Otomatis (REKOMENDASI — mirror Power Query)
+
+Centang **📂 Mode Folder Otomatis** di tab Pipeline. Program otomatis membaca
+SEMUA file `.xlsx` dari folder yang sama persis dengan `Folder.Files("...")`
+di M code `04.QUERRY SJ.xlsb`:
+
+| Sumber | Folder (dari M code) |
+|---|---|
+| Kirim (42.15) | `C:\KERJA\1. RESTO\9.NEW QUERY\3. 42.15` |
+| Terima (42.05) | `C:\KERJA\1. RESTO\9.NEW QUERY\4. 42.05` |
+| Kategori | `C:\KERJA\1. RESTO\9.NEW QUERY\21. DBS Kategori` |
+
+Bila folder Anda di lokasi lain, edit `source_folders.base` di
+`sj_anomaly/config.json`. Tombol **🔄 Isi Otomatis dari Config** mengisi 3 field
+dengan path dari config.
+
+#### Mode File Manual
+
+Bila tidak ingin pakai folder, hilangkan centang mode folder → pilih 3 file
+`.xlsx` individually via tombol **Telusuri…** (atau pilih folder, semua `.xlsx`
+di folder tersebut akan dibaca).
+
+1. **Tab Pipeline** → centang mode folder ATAU pilih 3 file:
    - **42.15 Pemindahan Barang (Kirim)** — sheet `#42.15. Pemindahan Barang (KIRI`
    - **42.05 Rincian Pemindahan (Terima)** — sheet `#42.05. Rincian Pemindahan Bara`
    - **DBS Kategori** — sheet `Sheet1` (NAMA BARANG / KATEGORI / JENIS)
@@ -92,6 +114,17 @@ python ui_app.py
 4. **Tab Anomali** → tabel baris dengan status ≠ NORMAL (filter gudang/barang/status)
 5. **Tab Kirim vs Terima** → rekonsiliasi dokumen (highlight dokumen hilang + terima lambat)
 6. Toolbar **💾 Ekspor Excel** → laporan 6 sheet (Detail · Anomali Prioritas · Ringkasan · Rekap Count · Log Run)
+
+#### Auto-detect Header Row (anti error "nama barang hilang")
+
+Report ACCURATE asli punya struktur yang bervariasi:
+- Jumlah baris judul bisa 2/3/4 baris (bukan selalu 3).
+- Header bisa merged-cell (tiap header menempel 2 kolom fisik → kolom kanan
+  terbaca `nan`/`ColumnN`).
+
+Program otomatis scan 15 baris pertama dan memilih baris dengan skor keyword
+tertinggi (`Nama Barang`, `Satuan`, `Nomor #Kirim`, dst.) sebagai baris header.
+Blank `ColumnN` placeholder otomatis dilewati. Tidak perlu edit skip_rows manual.
 
 ## Konfigurasi Threshold
 

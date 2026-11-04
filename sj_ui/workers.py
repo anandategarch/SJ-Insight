@@ -13,7 +13,7 @@ import pandas as pd
 from PySide6.QtCore import QThread, Signal
 
 from sj_anomaly.exporter import export_to_excel
-from sj_anomaly.pipeline import run_pipeline
+from sj_anomaly.pipeline import run_pipeline, run_pipeline_from_folders
 from sj_anomaly.utils import load_config
 
 
@@ -21,6 +21,11 @@ class PipelineWorker(QThread):
     """Jalankan pipeline SJ Insight di background thread.
 
     Cancel efektif antar-stage (cancel_check).
+
+    Mode:
+      - FILE/FOLDER eksplisit: kirim_path/terima_path/kategori_path diberikan.
+      - FOLDER OTOMATIS dari config: ``folder_mode=True`` — path di-resolve
+        dari ``source_folders`` di config.json (mirror M code Folder.Files).
     """
 
     progress = Signal(str, float)
@@ -29,10 +34,11 @@ class PipelineWorker(QThread):
 
     def __init__(
         self,
-        kirim_path: str,
-        terima_path: str,
-        kategori_path: str,
+        kirim_path: str | None = None,
+        terima_path: str | None = None,
+        kategori_path: str | None = None,
         config_path: str | None = None,
+        folder_mode: bool = False,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -40,6 +46,7 @@ class PipelineWorker(QThread):
         self._terima_path = terima_path
         self._kategori_path = kategori_path
         self._config_path = config_path
+        self._folder_mode = folder_mode
         self._cancel = False
 
     def cancel(self) -> None:
@@ -47,14 +54,29 @@ class PipelineWorker(QThread):
 
     def run(self) -> None:
         try:
-            summary = run_pipeline(
-                kirim_path=self._kirim_path,
-                terima_path=self._terima_path,
-                kategori_path=self._kategori_path,
-                config_path=self._config_path,
-                progress_callback=lambda msg, pct: self.progress.emit(str(msg), float(pct)),
-                cancel_check=lambda: self._cancel,
-            )
+            if self._folder_mode:
+                overrides = {}
+                if self._kirim_path:
+                    overrides["kirim"] = self._kirim_path
+                if self._terima_path:
+                    overrides["terima"] = self._terima_path
+                if self._kategori_path:
+                    overrides["kategori"] = self._kategori_path
+                summary = run_pipeline_from_folders(
+                    config_path=self._config_path,
+                    overrides=overrides,
+                    progress_callback=lambda msg, pct: self.progress.emit(str(msg), float(pct)),
+                    cancel_check=lambda: self._cancel,
+                )
+            else:
+                summary = run_pipeline(
+                    kirim_path=self._kirim_path,
+                    terima_path=self._terima_path,
+                    kategori_path=self._kategori_path,
+                    config_path=self._config_path,
+                    progress_callback=lambda msg, pct: self.progress.emit(str(msg), float(pct)),
+                    cancel_check=lambda: self._cancel,
+                )
         except Exception as e:
             self.failed.emit(str(e), traceback.format_exc())
             return

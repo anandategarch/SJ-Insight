@@ -12,6 +12,14 @@
     "kategori": ["Sheet1", "DBS_KATEGORI", "KATEGORI"]
   },
 
+  "_source_folders_doc": "Path folder sumber EXACT dari M code '04.QUERRY SJ.xlsb'. Power Query Folder.Files(\"C:\\KERJA\\1. RESTO\\9.NEW QUERY\\<subfolder>\"). Program otomatis baca SEMUA .xlsx di folder ini (mirror Folder.Files). Ubah 'base' bila folder Anda di lokasi lain.",
+  "source_folders": {
+    "base":               "C:\\KERJA\\1. RESTO\\9.NEW QUERY",
+    "kirim_subfolder":    "3. 42.15",
+    "terima_subfolder":   "4. 42.05",
+    "kategori_subfolder": "21. DBS Kategori"
+  },
+
   "kirim_columns": {
     "no_pemindahan": ["No. Pemindahan #", "No Pemindahan #", "No. Pemindahan"],
     "tanggal":       ["Tanggal"],

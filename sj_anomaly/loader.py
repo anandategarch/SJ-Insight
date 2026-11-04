@@ -340,16 +340,97 @@ def text_trim(v: Any) -> str:
 
 
 # ============================================================
-# LOAD WORKBOOK — skip 3 baris judul + promote headers
+# LOAD WORKBOOK — auto-detect header row + promote (robust vs merged cells)
 # ============================================================
+#
+# Masalah yang diselesaikan:
+#   Report ACCURATE asli punya struktur header yang berbeda dari sample:
+#     - 3 baris judul (ACCURATE Accounting / Halaman / Tercetak) — TAPI jumlah
+#       baris judul bisa berbeda antar export (ada yang 2, ada yang 4).
+#     - Header baris bisa merged-cell (tiap header menempel 2 kolom fisik →
+#       kolom kanan terbaca None/"ColumnN" oleh pandas/calamine).
+#   Jika skip_rows di-hardcode = 3, header salah baca → "Nama Barang"/"Satuan"
+#   hilang → SchemaError → run gagal.
+#
+# Solusi: auto-detect baris header dengan scan keyword ("Nama Barang", "Satuan",
+# "Nomor #Kirim", dst.) — baris dengan skor keyword tertinggi jadi header.
+# Blank "ColumnN" tetap dipertahankan (mirror M code `Changed Type1` yang
+# KEEPS placeholder utk Terima, dan `Removed Columns` di Kirim yang drops
+# placeholder). _find_column cukup pintar melewati placeholder tsb.
+
+# Keyword utama utk auto-detect header per source.
+# Dipilih dari M code final columns (Section 4 analysis).
+_HEADER_KEYWORDS = {
+    "kirim":    ["Nama Barang", "Satuan", "No. Pemindahan #", "Gudang Pengirim",
+                 "Gudang Tujuan", "Kuantitas", "Status Pemindahan", "Kts Diterima"],
+    "terima":   ["Nomor #Kirim", "Nomor #Terima", "Gudang #Kirim", "Gudang #Terima",
+                 "Tanggal #Kirim", "Tanggal #Terima", "Nama Barang", "#Sat. Kirim",
+                 "#Qty Kirim", "#Sat. Terkecil"],
+    "kategori": ["NAMA BARANG", "KATEGORI", "JENIS"],
+}
+
+
+def _score_header_row(row: list[Any], keywords_lower: list[str]) -> int:
+    """Hitung berapa keyword yang muncul di baris ini (case-insensitive, strip)."""
+    score = 0
+    cells_lower = set()
+    for cell in row:
+        if cell is None:
+            continue
+        s = str(cell).strip().lower()
+        if s:
+            cells_lower.add(s)
+    for kw in keywords_lower:
+        if not kw:
+            continue
+        # exact match prioritas
+        if kw in cells_lower:
+            score += 2
+            continue
+        # contains match (anti salah karena prefix/suffix kecil)
+        for c in cells_lower:
+            if kw in c:
+                score += 1
+                break
+    return score
+
+
+def _auto_detect_header_row(
+    matrix: list[list[Any]],
+    keywords: list[str],
+    max_scan: int = 15,
+    default_skip: int = 3,
+) -> int:
+    """Cari index baris yang paling cocok jadi header (skor keyword tertinggi).
+
+    Fallback: ``default_skip`` bila tidak ada baris dengan keyword (mis. sheet
+    polos tanpa header familiar, atau file sample dengan keyword sama di semua
+    baris judul — di situ default_skip lebih aman).
+    """
+    if not matrix:
+        return 0
+    kw_lower = [str(k).lower().strip() for k in keywords if k]
+    best_idx = default_skip
+    best_score = 0
+    scan_n = min(max_scan, len(matrix))
+    for i in range(scan_n):
+        s = _score_header_row(matrix[i], kw_lower)
+        if s > best_score:
+            best_score = s
+            best_idx = i
+    return best_idx
+
 
 def _promote_headers(matrix: list[list[Any]]) -> tuple[list[str], list[dict]]:
-    """Promote baris pertama sebagai header; sisanya → list[dict]."""
+    """Promote baris pertama sebagai header; sisanya → list[dict].
+
+    Blank/None header → ``Column{N}`` (mirror Power Query PromoteHeaders).
+    Anti-duplikat: "X", "X" → "X", "X.1".
+    """
     raw_headers = [
         (str(h).strip() if h is not None else "") or f"Column{i + 1}"
         for i, h in enumerate(matrix[0] if matrix else [])
     ]
-    # Anti duplikat: "X", "X" → "X", "X.1"
     seen: dict[str, int] = {}
     headers = []
     for h in raw_headers:
@@ -371,10 +452,20 @@ def load_sheet(
     candidates: list[str],
     skip_rows: int = 3,
     fallback_first: bool = True,
+    source_key: str | None = None,
 ) -> pd.DataFrame:
-    """Load sheet → DataFrame (header = baris setelah ``skip_rows``).
+    """Load sheet → DataFrame dengan **auto-detect baris header**.
 
-    Mirror M code: ``Table.Skip(3)`` + ``Table.PromoteHeaders``.
+    Mirror M code: ``Table.Skip(N)`` + ``Table.PromoteHeaders``, TAPI ``N``
+    ditentukan otomatis berdasarkan skor keyword (bukan hardcoded). Ini
+    menangani:
+      - Jumlah baris judul ACCURATE yang bervariasi (2/3/4 baris).
+      - Header merged-cell (blank ``ColumnN`` placeholder dilewati _find_column).
+      - File sample (header tunggal, 3 baris judul).
+
+    Args:
+      source_key: 'kirim' | 'terima' | 'kategori' — utk pilih keyword set.
+                  Bila None, pakai ``skip_rows`` default (tanpa auto-detect).
     """
     _guard_xls(workbook_path)
     sheets = list_sheets(workbook_path)
@@ -388,82 +479,227 @@ def load_sheet(
         sheet = sheets[0]
         _log.warning("Sheet kandidat tak ketemu — pakai sheet pertama: %s", sheet)
 
-    # Baca sebagai matrix (header=1) supaya kita bisa skip + promote manual
+    # Baca sebagai matrix (header=None) supaya kita bisa skip + promote manual
     df_raw = _read_excel_fast(
         workbook_path, sheet_name=sheet, header=None, dtype=object
     )
     matrix = df_raw.values.tolist()
     if not matrix:
         raise ValueError(f"Sheet '{sheet}' kosong.")
-    sliced = matrix[skip_rows:]
-    if not sliced:
+
+    # Auto-detect baris header bila source_key diberikan; else pakai skip_rows.
+    if source_key and source_key in _HEADER_KEYWORDS:
+        header_idx = _auto_detect_header_row(
+            matrix, _HEADER_KEYWORDS[source_key], max_scan=15, default_skip=skip_rows
+        )
+    else:
+        header_idx = skip_rows
+
+    sliced = matrix[header_idx:]
+    if not sliced or len(sliced) < 2:
         raise ValueError(
-            f"Sheet '{sheet}' hanya berisi {skip_rows} baris judul — tidak ada data."
+            f"Sheet '{sheet}' hanya berisi {header_idx} baris judul — tidak ada data. "
+            f"(auto-detect header di baris {header_idx + 1})"
         )
     headers, rows = _promote_headers(sliced)
     df = pd.DataFrame(rows, columns=headers)
+    df.attrs["sheet"] = sheet
+    df.attrs["header_row"] = header_idx + 1  # 1-indexed utk pesan user
     return _normalize_columns(df)
 
 
 # ============================================================
-# LOAD 1: KIRIM 42.15
+# FOLDER MODE — mirror Power Query Folder.Files (combine all .xlsx)
+# ============================================================
+
+def list_folder_workbooks(folder_path: str | os.PathLike) -> list[Path]:
+    """List semua file .xlsx/.xlsm di folder (skip temp file ~$ dan non-Excel)."""
+    folder = Path(folder_path)
+    if not folder.exists():
+        raise FileNotFoundError(f"Folder sumber tidak ditemukan: {folder}")
+    if not folder.is_dir():
+        raise NotADirectoryError(f"Path bukan folder: {folder}")
+    files = sorted(
+        f for f in folder.iterdir()
+        if f.is_file()
+        and f.suffix.lower() in (".xlsx", ".xlsm")
+        and not f.name.startswith("~$")
+        and not f.name.startswith(".")
+    )
+    return files
+
+
+def load_folder(
+    folder_path: str | os.PathLike,
+    candidates: list[str],
+    config: dict,
+    source_key: str,
+    skip_rows: int = 3,
+    logger=None,
+) -> pd.DataFrame:
+    """Load SEMUA workbook di folder → satu DataFrame (mirror ``Folder.Files``).
+
+    Power Query ``Folder.Files("...")`` + ``Invoke Custom Function`` membaca
+    tiap file, lalu menggabungkan baris. Kolom ``Source.Name`` (nama file)
+    ditambahkan sebagai kolom pertama — sama seperti perilaku Power Query
+    ``PromoteAllScalars=true`` yang menjadikan filename sebagai header col 1.
+
+    Bila folder kosong / hanya 1 file, tetap jalan (single-file path).
+    """
+    files = list_folder_workbooks(folder_path)
+    if not files:
+        raise FileNotFoundError(
+            f"Folder '{folder_path}' tidak berisi file .xlsx/.xlsm. "
+            f"Letakkan report ACCURATE (42.15 / 42.05 / DBS_KATEGORI) di folder ini."
+        )
+    if logger:
+        logger(f"[loader] Folder '{Path(folder_path).name}': {len(files)} file .xlsx")
+
+    frames: list[pd.DataFrame] = []
+    last_header_row = 0
+    for f in files:
+        try:
+            df = load_sheet(
+                f, candidates, skip_rows=skip_rows,
+                source_key=source_key, fallback_first=True,
+            )
+        except Exception as exc:
+            if logger:
+                logger(f"[loader]   ⚠ {f.name}: {exc} — dilewati")
+            continue
+        # Tambah kolom Source.Name (filename) — mirror Power Query
+        df.insert(0, "Source.Name", f.name)
+        last_header_row = df.attrs.get("header_row", 0)
+        frames.append(df)
+        if logger:
+            logger(f"[loader]   ✓ {f.name}: {len(df)} baris, {len(df.columns)} kolom")
+
+    if not frames:
+        raise ValueError(
+            f"Tidak ada file di '{folder_path}' yang berhasil dibaca sebagai "
+            f"sheet '{candidates[0] if candidates else '?'}'."
+        )
+    combined = pd.concat(frames, ignore_index=True, sort=False)
+    combined.attrs["header_row"] = last_header_row
+    combined.attrs["source_files"] = [f.name for f in files]
+    return combined
+
+
+# ============================================================
+# RESOLVE SOURCE PATH — dari config (M code folder paths)
+# ============================================================
+
+def resolve_source_path(
+    source_key: str,
+    config: dict,
+    override: str | os.PathLike | None = None,
+) -> str:
+    """Resolve path sumber (folder atau file) utk key 'kirim'/'terima'/'kategori'.
+
+    Prioritas:
+      1. ``override`` eksplisit (UI file/folder picker).
+      2. ``source_folders`` di config (mirror M code Folder.Files path):
+           - base:      folder induk (mis. C:\\KERJA\\1. RESTO\\9.NEW QUERY)
+           - <key>_subfolder: nama subfolder (mis. '3. 42.15')
+      3. Fallback: folder 'data/' relatif terhadap config.
+    """
+    if override:
+        return str(override)
+    sf = config.get("source_folders", {})
+    base = sf.get("base", "")
+    sub = sf.get(f"{source_key}_subfolder", "")
+    if base and sub:
+        return str(Path(base) / sub)
+    # Fallback: pakai sample data folder
+    return ""
+
+
+# ============================================================
+# LOAD 1: KIRIM 42.15 — file atau folder mode
 # ============================================================
 
 def load_kirim(
-    workbook_path: str | os.PathLike,
+    source: str | os.PathLike,
     config: dict,
     logger=None,
 ) -> pd.DataFrame:
-    """Load sheet Kirim (42.15). Sheet '#42.15. Pemindahan Barang (KIRI'.
+    """Load Kirim (42.15). Sheet '#42.15. Pemindahan Barang (KIRI'.
 
-    Return DataFrame mentah dengan kolom asli (belum di-cast) — pipeline
-    yang menangani tipe. Hanya buang baris judul (skip=3) + promote header.
+    ``source`` bisa berupa:
+      - FILE .xlsx tunggal → load_sheet satu file.
+      - FOLDER → load_folder (baca semua .xlsx, gabungkan).
+    Auto-detect header row aktif (source_key='kirim').
     """
     candidates = config.get("input_sheets", {}).get(
         "kirim", ["#42.15. Pemindahan Barang (KIRI"]
     )
-    df = load_sheet(workbook_path, candidates, skip_rows=3)
+    p = Path(source)
+    if p.is_dir():
+        df = load_folder(p, candidates, config, "kirim", skip_rows=3, logger=logger)
+    else:
+        df = load_sheet(p, candidates, skip_rows=3, source_key="kirim")
     if logger:
+        hdr_row = df.attrs.get("header_row", "?")
+        src = df.attrs.get("source_files", [p.name])
         logger(
-            f"[loader] Kirim (42.15): sheet='{getattr(df, 'attrs', {}).get('sheet', '?')}', "
-            f"{len(df)} baris, {len(df.columns)} kolom (engine={_EXCEL_ENGINE or 'default'})"
+            f"[loader] Kirim (42.15): {len(df)} baris, {len(df.columns)} kolom "
+            f"(header@baris {hdr_row}, file={src if len(src) > 1 else src[0] if src else p.name}, "
+            f"engine={_EXCEL_ENGINE or 'default'})"
         )
     return df
 
 
 # ============================================================
-# LOAD 2: TERIMA 42.05
+# LOAD 2: TERIMA 42.05 — file atau folder mode
 # ============================================================
 
 def load_terima(
-    workbook_path: str | os.PathLike,
+    source: str | os.PathLike,
     config: dict,
     logger=None,
 ) -> pd.DataFrame:
-    """Load sheet Terima (42.05). Sheet '#42.05. Rincian Pemindahan Bara'."""
+    """Load Terima (42.05). Sheet '#42.05. Rincian Pemindahan Bara'."""
     candidates = config.get("input_sheets", {}).get(
         "terima", ["#42.05. Rincian Pemindahan Bara"]
     )
-    df = load_sheet(workbook_path, candidates, skip_rows=3)
+    p = Path(source)
+    if p.is_dir():
+        df = load_folder(p, candidates, config, "terima", skip_rows=3, logger=logger)
+    else:
+        df = load_sheet(p, candidates, skip_rows=3, source_key="terima")
     if logger:
-        logger(f"[loader] Terima (42.05): {len(df)} baris, {len(df.columns)} kolom")
+        hdr_row = df.attrs.get("header_row", "?")
+        src = df.attrs.get("source_files", [p.name])
+        logger(
+            f"[loader] Terima (42.05): {len(df)} baris, {len(df.columns)} kolom "
+            f"(header@baris {hdr_row}, file={src if len(src) > 1 else src[0] if src else p.name})"
+        )
     return df
 
 
 # ============================================================
-# LOAD 3: KATEGORI
+# LOAD 3: KATEGORI — file atau folder mode
 # ============================================================
 
 def load_kategori(
-    workbook_path: str | os.PathLike,
+    source: str | os.PathLike,
     config: dict,
     logger=None,
 ) -> pd.DataFrame:
-    """Load sheet DBS Kategori (Sheet1). Header di baris pertama (skip=0)."""
+    """Load DBS Kategori (Sheet1). Header di baris pertama (skip=0)."""
     candidates = config.get("input_sheets", {}).get(
         "kategori", ["Sheet1", "DBS_KATEGORI"]
     )
-    df = load_sheet(workbook_path, candidates, skip_rows=0)
+    p = Path(source)
+    if p.is_dir():
+        df = load_folder(p, candidates, config, "kategori", skip_rows=0, logger=logger)
+    else:
+        df = load_sheet(p, candidates, skip_rows=0, source_key="kategori")
     if logger:
-        logger(f"[loader] Kategori: {len(df)} baris, {len(df.columns)} kolom")
+        hdr_row = df.attrs.get("header_row", "?")
+        src = df.attrs.get("source_files", [p.name])
+        logger(
+            f"[loader] Kategori: {len(df)} baris, {len(df.columns)} kolom "
+            f"(header@baris {hdr_row}, file={src if len(src) > 1 else src[0] if src else p.name})"
+        )
     return df

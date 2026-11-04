@@ -79,6 +79,10 @@ QPushButton#danger {{ background: #ffffff; color: #dc2626; border: 1px solid #fe
 QPushButton#danger:hover {{ background: #fef2f2; }}
 QPushButton#danger:focus {{ border-color: #dc2626; }}
 
+QPushButton#ghost {{ background: transparent; color: {C_ACCENT_HOVER}; border: 1px dashed {C_BORDER}; }}
+QPushButton#ghost:hover {{ background: #f0fdfa; border-color: {C_ACCENT}; border-style: solid; }}
+QPushButton#ghost:focus {{ border-color: {C_ACCENT}; }}
+
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {{
     background: #ffffff;
     border: 1px solid {C_BORDER};
