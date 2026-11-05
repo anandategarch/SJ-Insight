@@ -7,8 +7,8 @@
   },
 
   "input_sheets": {
-    "kirim":    ["#42.15. Pemindahan Barang (KIRI", "42.15. Pemindahan Barang", "Pemindahan Barang"],
-    "terima":   ["#42.05. Rincian Pemindahan Bara", "42.05. Rincian Pemindahan", "Rincian Pemindahan"],
+    "kirim":    ["#42.15. Pemindahan Barang (KIRI", "42.15. Pemindahan Barang", "Pemindahan Barang", "KIRIM"],
+    "terima":   ["#42.05. Rincian Pemindahan Bara", "42.05. Rincian Pemindahan", "Rincian Pemindahan", "4205_TERIMA"],
     "kategori": ["Sheet1", "DBS_KATEGORI", "KATEGORI"]
   },
 
@@ -30,7 +30,7 @@
     "nama":          ["Nama Barang"],
     "satuan":        ["Satuan"],
     "qty_terkecil":  ["Kts Diterima", "QTY Terkecil", "Kts. Diterima"],
-    "kuantitas":     ["Kuantitas"],
+    "kuantitas":     ["Kuantitas", "QTY", "Qty"],
     "status":        ["Status Pemindahan Barang", "Status Pemindahan"]
   },
 

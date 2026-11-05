@@ -28,12 +28,19 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-# Engine selection: calamine (cepat) → fallback openpyxl (default pandas)
+# Engine selection: calamine (cepat, support .xlsx/.xlsm) → fallback openpyxl.
+# .xlsb (Excel 2007 Binary) ditangani terpisah via pyxlsb (lihat _read_excel_fast).
 try:
     import python_calamine  # noqa: F401
     _EXCEL_ENGINE = "calamine"
 except ImportError:
     _EXCEL_ENGINE = None  # pandas pakai default (openpyxl)
+
+try:
+    import pyxlsb  # noqa: F401
+    _XLSB_ENGINE = "pyxlsb"
+except ImportError:
+    _XLSB_ENGINE = None
 
 from openpyxl import load_workbook
 
@@ -76,9 +83,25 @@ def _normalize_float_precision(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _is_xlsb(path) -> bool:
+    """Cek apakah file adalah .xlsb (Excel 2007 Binary Workbook)."""
+    return Path(path).suffix.lower() == ".xlsb"
+
+
 def _read_excel_fast(path, sheet_name, **kwargs):
-    """Wrapper pd.read_excel dengan engine optimal (calamine jika ada)."""
-    if _EXCEL_ENGINE:
+    """Wrapper pd.read_excel dengan engine optimal.
+
+    - .xlsb → pyxlsb (wajib install pyxlsb)
+    - .xlsx/.xlsm → calamine (cepat) atau fallback openpyxl (default pandas)
+    """
+    if _is_xlsb(path):
+        if not _XLSB_ENGINE:
+            raise ValueError(
+                "File .xlsb (Excel Binary Workbook) butuh package 'pyxlsb'. "
+                "Install: pip install pyxlsb"
+            )
+        df = pd.read_excel(path, sheet_name=sheet_name, engine=_XLSB_ENGINE, **kwargs)
+    elif _EXCEL_ENGINE:
         df = pd.read_excel(path, sheet_name=sheet_name, engine=_EXCEL_ENGINE, **kwargs)
     else:
         df = pd.read_excel(path, sheet_name=sheet_name, **kwargs)
@@ -96,8 +119,16 @@ def _guard_xls(workbook_path: str | os.PathLike) -> None:
 # ============================================================
 
 def list_sheets(workbook_path: str | os.PathLike) -> list[str]:
-    """List semua sheet di workbook (openpyxl, read-only)."""
+    """List semua sheet di workbook (.xlsx via openpyxl, .xlsb via pyxlsb)."""
     _guard_xls(workbook_path)
+    if _is_xlsb(workbook_path):
+        if not _XLSB_ENGINE:
+            raise ValueError(
+                "File .xlsb butuh package 'pyxlsb'. Install: pip install pyxlsb"
+            )
+        from pyxlsb import open_workbook
+        with open_workbook(workbook_path) as wb:
+            return list(wb.sheets)
     wb = load_workbook(workbook_path, read_only=True, data_only=True)
     sheets = list(wb.sheetnames)
     wb.close()
@@ -221,7 +252,7 @@ def parse_date_value(v: Any, with_time: bool = False) -> str | None:
     if isinstance(v, _dt.date):
         return v.strftime("%Y-%m-%d")
 
-    if isinstance(v, (int, float)) and not math.isnan(v) and isfinite(v):
+    if isinstance(v, (int, float)) and not math.isnan(v) and math.isfinite(v):
         try:
             serial = int(v)
             if 1 < serial < 200000:  # reasonable Excel date range
@@ -522,7 +553,7 @@ def list_folder_workbooks(folder_path: str | os.PathLike) -> list[Path]:
     files = sorted(
         f for f in folder.iterdir()
         if f.is_file()
-        and f.suffix.lower() in (".xlsx", ".xlsm")
+        and f.suffix.lower() in (".xlsx", ".xlsm", ".xlsb")
         and not f.name.startswith("~$")
         and not f.name.startswith(".")
     )

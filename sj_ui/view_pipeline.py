@@ -243,7 +243,7 @@ class PipelineView(QWidget):
                 start_dir = str(Path(cur).parent)
             path, _ = QFileDialog.getOpenFileName(
                 self, "Pilih file Excel", start_dir,
-                "Excel Workbook (*.xlsx *.xlsm);;Semua file (*)",
+                "Excel Workbook (*.xlsx *.xlsm *.xlsb);;Semua file (*)",
             )
             if path:
                 edit.setText(path)
