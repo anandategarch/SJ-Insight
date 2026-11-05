@@ -141,7 +141,25 @@ def export_to_excel(
             _write(wb, str(sheet_name), extra_df, freeze="A2")
             n_extra += 1
 
-        # 6. Log Run
+        # 6. Sheet views tambahan — mirror sheet di file asli '04.QUERRY SJ.xlsb'
+        # Generate 8 view: Upload, Terima Pivot, Manual, Kirim Pivot,
+        # Double Terima, Double Kirim, 4215 Terima, 4215 Kirim
+        try:
+            from .sheets import generate_all_views
+            df_kirim = summary.get("df")
+            if df_kirim is not None and df_count is not None:
+                views = generate_all_views(df_kirim, df_merged, df_count)
+                for vname, vdf in views.items():
+                    if vdf is None or vdf.empty:
+                        continue
+                    _write(wb, vname, vdf, freeze="A2")
+                    n_extra += 1
+        except Exception as exc:
+            # Views tambahan gagal = tidak fatal, lanjutkan ke Log Run
+            import logging
+            logging.getLogger(__name__).warning("sheets views gagal: %s", exc)
+
+        # 7. Log Run
         log_name = sheet_cfg.get("log_sheet", "Log Run")
         df_log = _build_log(summary, log_lines)
         _write(wb, log_name, df_log, freeze="A2")

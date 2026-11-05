@@ -37,6 +37,7 @@ from .state import AppContext
 from .theme import QSS
 from .view_anomali import AnomaliView
 from .view_dashboard import DashboardView
+from .view_laporan import LaporanView
 from .view_merge import MergeView
 from .view_pipeline import PipelineView
 from .workers import ExportWorker
@@ -49,8 +50,9 @@ def _build_help_html() -> str:
 <p><b>Alur kerja:</b> tab <b>Pipeline</b> → centang <b>📂 Mode Folder Otomatis</b>
 (atau pilih 3 file manual) → <b>▶ Jalankan Analisa</b> → buka tab
 <b>Dashboard</b> untuk KPI / <b>Anomali</b> untuk tabel baris mencurigakan /
-<b>Kirim vs Terima</b> untuk rekonsiliasi dokumen.</p>
-<p><b>Shortcut:</b> <b>Ctrl+1..Ctrl+4</b> pindah tab · <b>Ctrl+E</b> ekspor Excel
+<b>Kirim vs Terima</b> untuk rekonsiliasi dokumen / <b>Laporan Lengkap</b>
+untuk 8 view sheet mirror file asli xlsb.</p>
+<p><b>Shortcut:</b> <b>Ctrl+1..Ctrl+5</b> pindah tab · <b>Ctrl+E</b> ekspor Excel
 · <b>F1</b> bantuan ini.</p>
 <h3>Tab Pipeline (tempat semua dimulai)</h3>
 <ul>
@@ -98,10 +100,25 @@ hijau=normal).</li>
 <li><b>Selisih Hari</b> = Tanggal #Terima − Tanggal kirim (≥ 2 hari = terima lambat).</li>
 <li>Tombol <b>⚑ Hanya Kirim tanpa Terima</b> & <b>⚑ Hanya Terima Lambat</b> — toggle filter.</li>
 </ul>
+<h3>Tab Laporan Lengkap (baru)</h3>
+<p>8 view sheet yang <b>mirror persis</b> sheet di file asli <code>04.QUERRY SJ.xlsb</code>:</p>
+<ul>
+<li><b>Upload</b> — view gabungan Kirim×Terima (mirror sheet UPLOAD, 1487 baris).</li>
+<li><b>Terima Pivot</b> — pivot Kirim dgn Status Anomali (mirror sheet TERIMA).</li>
+<li><b>Manual</b> — filter Kirim subset tanpa kolom analisa (mirror sheet MANUAL).</li>
+<li><b>Kirim Pivot</b> — pivot Kirim mentah (mirror sheet KIRIM).</li>
+<li><b>Double Terima</b> — filter Count&gt;1 Concet, view Terima (mirror DOUBLE TERIMA).</li>
+<li><b>Double Kirim</b> — filter Count&gt;1 Concet, view Kirim (mirror DOUBLE KIRIM).</li>
+<li><b>4215 Terima</b> — flat table = df_kirim (mirror 4215_TERIMA).</li>
+<li><b>4215 Kirim</b> — flat table subset (mirror 4215_KIRIM).</li>
+</ul>
+<p>Pilih view dari dropdown — data di-generate on-the-fly dari pipeline. Semua
+8 view juga di-include saat <b>💾 Ekspor Excel</b>.</p>
 <h3>Ekspor Excel</h3>
 <p>Tombol <b>💾 Ekspor Excel</b> di toolbar (aktif setelah pipeline selesai) —
-laporan 6 sheet: Detail · Anomali Prioritas · Ringkasan · Rekap Count · Log Run
-(+ extra bila ada).</p>
+laporan lengkap: Detail · Anomali Prioritas · Ringkasan · Rekap Count ·
+Upload · Terima Pivot · Manual · Kirim Pivot · Double Terima · Double Kirim ·
+4215 Terima · 4215 Kirim · Log Run.</p>
 <h3>💡 Sumber Spesifikasi</h3>
 <p>Program ini adalah replika Power Query M code dari file
 <b>04.QUERRY SJ.xlsb</b> (29 query, 1.034 baris M code). Semua mapping header,
@@ -136,10 +153,12 @@ class MainWindow(QMainWindow):
         self._anomali = AnomaliView(self.ctx)
         self._merge = MergeView(self.ctx)
         self._pipeline = PipelineView(self.ctx)
+        self._laporan = LaporanView(self.ctx)
         self._tabs.addTab(self._pipeline, "⚙ Pipeline")
         self._tabs.addTab(self._dashboard, "📊 Dashboard")
         self._tabs.addTab(self._anomali, "🚨 Anomali")
         self._tabs.addTab(self._merge, "↔ Kirim vs Terima")
+        self._tabs.addTab(self._laporan, "📋 Laporan Lengkap")
         self.setCentralWidget(self._tabs)
 
         # Default tab: Pipeline (tempat mulai)
@@ -189,8 +208,8 @@ class MainWindow(QMainWindow):
         tb.addAction(act_help)
 
     def _setup_shortcuts(self) -> None:
-        """Ctrl+1..4 pindah tab."""
-        for i in range(4):
+        """Ctrl+1..5 pindah tab."""
+        for i in range(5):
             sc = QKeySequence(f"Ctrl+{i + 1}")
             act = QAction(self)
             act.setShortcut(sc)
